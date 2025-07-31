@@ -7,6 +7,7 @@ import secrets
 import string
 import os
 import requests
+import re
 
 # --- Configuración de intents ---
 intents = discord.Intents.default()
@@ -218,12 +219,27 @@ async def emoji(ctx, nombre: str, *, roles: str):
     await ctx.send(f'😎 Emoji creado: <:{emoji.name}:{emoji.id}> solo para roles: {roles}')
 
 @bot.command()
-async def mem(ctx):
-    img_name = random.choice(os.listdir('images'))
-    # ¡Y así es como se puede sustituir el nombre del fichero desde una variable!
-    with open(f'images/{img_name}', 'rb') as f:
-        picture = discord.File(f)
-        await ctx.send(file=picture)
+async def mem(ctx, categoria: str = None):
+    base_path = 'images'
+    
+    if categoria is None:
+        categorias = [name for name in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, name))]
+        await ctx.send(f"📂 Categorías disponibles: {', '.join(categorias)}")
+        return
+
+    categoria_path = os.path.join(base_path, categoria.lower())
+    if not os.path.exists(categoria_path) or not os.path.isdir(categoria_path):
+        await ctx.send("⚠️ Categoría no encontrada. Usa `/mem` para ver las disponibles.")
+        return
+
+    archivos = os.listdir(categoria_path)
+    if not archivos:
+        await ctx.send("⚠️ No hay memes en esta categoría.")
+        return
+
+    imagen_aleatoria = random.choice(archivos)
+    with open(os.path.join(categoria_path, imagen_aleatoria), 'rb') as f:
+        await ctx.send(file=discord.File(f))
 
 def get_duck_image_url():    
     url = 'https://random-d.uk/api/random'
@@ -238,6 +254,86 @@ async def duck(ctx):
     el programa llama a la función get_duck_image_url'''
     image_url = get_duck_image_url()
     await ctx.send(image_url)
+
+@bot.command()
+async def traducir(ctx, idioma: str, *, texto: str):
+    urls = [
+        "https://libretranslate.de/translate",
+        "https://translate.argosopentech.com/translate"
+    ]
+
+    payload = {
+        "q": texto,
+        "source": "auto",
+        "target": idioma.lower(),
+        "format": "text"
+    }
+
+    for url in urls:
+        try:
+            response = requests.post(url, json=payload, timeout=5)
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    traduccion = data.get("translatedText")
+                    if traduccion:
+                        await ctx.send(f"🌍 Traducción a **{idioma}**:\n👉 {traduccion}")
+                        return
+                except Exception:
+                    continue  # Prueba el siguiente servidor si falla el JSON
+        except requests.exceptions.RequestException:
+            continue
+
+    await ctx.send("❌ No se pudo traducir el texto. Intenta más tarde.")
+
+@bot.command()
+async def idiomas(ctx):
+    urls = [
+        "https://libretranslate.de/languages",
+        "https://translate.argosopentech.com/languages"
+    ]
+
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    lista = [f"{lang['name']} ({lang['code']})" for lang in data]
+                    mensaje = "🌐 Idiomas disponibles:\n" + "\n".join(lista)
+                    await ctx.send(mensaje)
+                    return
+                except Exception:
+                    continue  # Prueba el siguiente servidor si falla el JSON
+        except requests.exceptions.RequestException:
+            continue
+
+    await ctx.send("❌ No se pudo obtener la lista de idiomas desde ningún servidor.")
+
+@bot.command()
+async def recordar(ctx, tiempo: str, *, mensaje: str):
+    # Expresión para detectar formato como "10s", "5m", "2h"
+    patron = r"^(\d+)([smh])$"
+    match = re.match(patron, tiempo.lower())
+
+    if not match:
+        await ctx.send("⚠️ Usa un formato de tiempo válido: 10s, 5m, 2h.")
+        return
+
+    cantidad, unidad = match.groups()
+    cantidad = int(cantidad)
+
+    # Convertir a segundos
+    segundos = cantidad
+    if unidad == 'm':
+        segundos *= 60
+    elif unidad == 'h':
+        segundos *= 3600
+
+    await ctx.send(f"⏰ Te recordaré en {cantidad}{unidad}: **{mensaje}**")
+
+    await asyncio.sleep(segundos)
+    await ctx.send(f"🔔 ¡Recordatorio! {ctx.author.mention}: **{mensaje}**")
 
 # --- Evento on_ready y arranque del bot ---
 @bot.event
