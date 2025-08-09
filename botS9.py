@@ -335,12 +335,214 @@ async def recordar(ctx, tiempo: str, *, mensaje: str):
     await asyncio.sleep(segundos)
     await ctx.send(f"🔔 ¡Recordatorio! {ctx.author.mention}: **{mensaje}**")
 
+# --- Menú de Preguntas Específicas ---
+class PreguntasView(discord.ui.View):
+    def __init__(self, ctx, tema, timeout=120):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.tema = tema
+        self.message = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("⚠️ No puedes usar este menú.", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            await self.message.edit(view=self)
+
+    @discord.ui.button(label="¿Qué es?", style=discord.ButtonStyle.primary, row=0)
+    async def que_es(self, interaction: discord.Interaction, button: discord.ui.Button):
+        respuestas = {
+            "Reciclaje": "♻️ El reciclaje es el proceso de recolectar y procesar materiales que de otro modo serían desechados como basura y convertirlos en nuevos productos.",
+            "Calentamiento Global": "🌍 El calentamiento global es el aumento gradual de la temperatura de la Tierra debido a la acumulación de gases de efecto invernadero en la atmósfera.",
+            "Deforestación": "🌳 La deforestación es la tala o eliminación de bosques y selvas, normalmente para dar paso a actividades humanas como la agricultura o construcción."
+        }
+        await interaction.response.send_message(respuestas[self.tema], ephemeral=True)
+
+    @discord.ui.button(label="¿Qué hace?", style=discord.ButtonStyle.success, row=1)
+    async def que_hace(self, interaction: discord.Interaction, button: discord.ui.Button):
+        respuestas = {
+            "Reciclaje": "♻️ El reciclaje reduce la cantidad de residuos enviados a vertederos e incineradoras, conserva recursos naturales y ahorra energía.",
+            "Calentamiento Global": "🌍 El calentamiento global provoca cambios climáticos extremos, aumento del nivel del mar y pérdida de biodiversidad.",
+            "Deforestación": "🌳 La deforestación destruye hábitats, contribuye al cambio climático y reduce la biodiversidad."
+        }
+        await interaction.response.send_message(respuestas[self.tema], ephemeral=True)
+
+    @discord.ui.button(label="¿Es bueno?", style=discord.ButtonStyle.secondary, row=2)
+    async def es_bueno(self, interaction: discord.Interaction, button: discord.ui.Button):
+        respuestas = {
+            "Reciclaje": "✅ Sí, el reciclaje es bueno para el medio ambiente y la economía circular.",
+            "Calentamiento Global": "❌ No, el calentamiento global es perjudicial para todos los ecosistemas y la vida humana.",
+            "Deforestación": "❌ No, la deforestación causa daños ambientales graves y a largo plazo."
+        }
+        await interaction.response.send_message(respuestas[self.tema], ephemeral=True)
+
+    @discord.ui.button(label="Salir", style=discord.ButtonStyle.danger, row=3)
+    async def salir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"🚪 Menú de **{self.tema}** cerrado.", ephemeral=True)
+        self.stop()
+
+
+# --- Menú Inicial ---
+class ContaminacionView(discord.ui.View):
+    def __init__(self, ctx, timeout=60):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.message = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("⚠️ No puedes usar este menú.", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            await self.message.edit(view=self)
+
+    async def cambiar_a_preguntas(self, interaction, tema):
+        view = PreguntasView(self.ctx, tema)
+        view.message = await interaction.response.edit_message(content=f"📚 **{tema}** - Elige una pregunta:", view=view)
+
+    @discord.ui.button(label="Reciclaje", style=discord.ButtonStyle.success, row=0)
+    async def reciclaje(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cambiar_a_preguntas(interaction, "Reciclaje")
+
+    @discord.ui.button(label="Calentamiento Global", style=discord.ButtonStyle.primary, row=1)
+    async def calentamiento_global(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cambiar_a_preguntas(interaction, "Calentamiento Global")
+
+    @discord.ui.button(label="Deforestación", style=discord.ButtonStyle.secondary, row=2)
+    async def deforestacion(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cambiar_a_preguntas(interaction, "Deforestación")
+
+    @discord.ui.button(label="Salir", style=discord.ButtonStyle.danger, row=3)
+    async def salir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🚪 Menú cerrado.", ephemeral=True)
+        self.stop()
+
+@bot.command(name="comandos")
+async def comandos(ctx):
+    embed = discord.Embed(
+        title="📜 Lista de Comandos",
+        description="Aquí tienes todos los comandos organizados por categorías:",
+        color=discord.Color.green()
+    )
+
+    # 🎵 Música
+    embed.add_field(
+        name="🎵 Música",
+        value=(
+            "`/join <canal>` → El bot se une a un canal de voz.\n"
+            "`/play <ruta>` → Reproduce un archivo de audio.\n"
+            "`/yt <URL>` → Reproduce audio desde un video de YouTube.\n"
+            "`/stream <URL>` → Transmite audio en vivo desde YouTube.\n"
+            "`/volume <0-100>` → Ajusta el volumen.\n"
+            "`/stop` → Desconecta al bot del canal de voz."
+        ),
+        inline=False
+    )
+
+    # 🎲 Juegos y utilidades
+    embed.add_field(
+        name="🎲 Juegos y Utilidades",
+        value=(
+            "`/dado` → Lanza un dado de 6 caras.\n"
+            "`/roll NdN` → Lanza dados personalizados (ej: 2d6).\n"
+            "`/choose <op1> <op2> ...` → Elige aleatoriamente entre opciones.\n"
+            "`/repetir <texto>` → Repite el texto indicado.\n"
+            "`/repeat <n> <texto>` → Repite el texto n veces."
+        ),
+        inline=False
+    )
+
+    # 🔑 Seguridad y contraseñas
+    embed.add_field(
+        name="🔑 Seguridad",
+        value=(
+            "`/generar_password` → Genera una contraseña segura de 12 caracteres.\n"
+            "`/password <longitud>` → Genera una contraseña segura de la longitud indicada."
+        ),
+        inline=False
+    )
+
+    # 📅 Información de usuarios
+    embed.add_field(
+        name="📅 Información",
+        value=(
+            "`/joined <usuario>` → Muestra cuándo se unió el usuario.\n"
+            "`/cool <texto>` → Responde si el texto es cool."
+        ),
+        inline=False
+    )
+
+    # 🔒 Comandos secretos
+    embed.add_field(
+        name="🔒 Comandos Secretos",
+        value=(
+            "`/secret text <nombre> <usuarios/roles>` → Crea un canal de texto privado.\n"
+            "`/secret voice <nombre> <usuarios/roles>` → Crea un canal de voz privado.\n"
+            "`/secret emoji <nombre> <roles>` → Crea un emoji privado."
+        ),
+        inline=False
+    )
+
+    # 🌍 Traducción y lenguajes
+    embed.add_field(
+        name="🌍 Traducción",
+        value=(
+            "`/traducir <idioma> <texto>` → Traduce el texto al idioma indicado.\n"
+            "`/idiomas` → Muestra idiomas disponibles para traducir."
+        ),
+        inline=False
+    )
+
+    # 🖼️ Imágenes y memes
+    embed.add_field(
+        name="🖼️ Imágenes y Memes",
+        value=(
+            "`/mem <categoría>` → Envía un meme de la categoría.\n"
+            "`/duck` → Manda una imagen aleatoria de un pato."
+        ),
+        inline=False
+    )
+
+    # ⏰ Recordatorios
+    embed.add_field(
+        name="⏰ Recordatorios",
+        value=(
+            "`/recordar <tiempo> <mensaje>` → Envía un recordatorio después del tiempo indicado (ej: 10s, 5m, 2h)."
+        ),
+        inline=False
+    )
+
+    # 🌱 Educación ambiental
+    embed.add_field(
+        name="🌱 Educación Ambiental",
+        value=(
+            "`/Contaminacion` → Muestra un menú interactivo con temas sobre contaminación."
+        ),
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
+@bot.command(name="Contaminacion")
+async def contaminacion(ctx):
+    view = ContaminacionView(ctx, timeout=60)
+    view.message = await ctx.send("🌱 **Elige un tema sobre contaminación:**", view=view)  
+
 # --- Evento on_ready y arranque del bot ---
 @bot.event
 async def on_ready():
     await bot.add_cog(Music(bot))
     print(f'✅ Bot listo como {bot.user} (ID: {bot.user.id})')
-
-
 
 bot.run('TU TOKEN AQUI')
